@@ -1,6 +1,6 @@
 ---
 title: "Tabela"
-author: "Danilo"
+author: "Danilo Felipe"
 date: "2024-05-22"
 output: pdf_document
 ---
