@@ -54,6 +54,19 @@ qqline(model$residuals)
 hist(model$residuals)
 plot(model)
 ```
+
+```{r}
+leaps <- regsubsets(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel), nbest= 1,data = dados,nvmax = 18)
+
+plot(leaps,scale = "bic")
+
+plot(summary(leaps)$bic,type = "l")
+plot(summary(leaps)$rsq,type = "l")
+plot(summary(leaps)$cp,type = "l")
+plot(summary(leaps)$adjr2,type = "l")
+plot(summary(leaps)$rss, type = "l")
+```
+
 ```{r}
 library(leaps)
 
