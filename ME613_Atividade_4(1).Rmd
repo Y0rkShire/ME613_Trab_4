@@ -1,0 +1,90 @@
+---
+title: "Tabela"
+author: "Danilo"
+date: "2024-05-22"
+output: pdf_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r setup, include=FALSE}
+temp <- read.csv("//smb/ra204244/Downloads/fipe_2022/fipe_2022.csv")
+
+```
+
+```{r vereificação dos dados}
+dados <- temp %>% filter(month_of_reference == "November")
+
+table(dados$fuel)
+boxplot(dados$engine_size)
+boxplot(dados$year_model)
+hist(dados$avg_price_brl)
+#aqui foram analisados os dados por outliers foram validados os dados para análise
+pairs(dados[9:11])
+#apos não perceber nenhuma correlação perceptivel direta entre as variáveis assumimos independencia 
+dados <- dados[-c(3,4,6,10)]
+```
+
+```{r tratamento de dados}
+`%nin%` = Negate(`%in%`)
+dados$brand <- ifelse(dados$brand %nin% c("VW - VolksWagen","Fiat","GM - Chevrolet","BMW","Mercedes-Benz","Renault","Peugeot","Ford","Citroën","Audi","Hyundai","Mitsubishi"),"Alternativos",dados$brand)
+
+dados <- dados %>% filter(avg_price_brl < 100000)
+#analisando carros de preço acessivel
+```
+
+
+```{r}
+summary(lm(avg_price_brl/1000 ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados))
+
+model <- lm(avg_price_brl ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
+
+qqnorm(model$residuals)
+qqline(model$residuals)
+hist(model$residuals)
+plot(model)
+
+model <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
+
+qqnorm(model$residuals)
+qqline(model$residuals)
+hist(model$residuals)
+plot(model)
+```
+```{r}
+library(leaps)
+
+model <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel)+
+              age_years*as.factor(brand)+ age_years*as.factor(gear) + age_years*engine_size + age_years*as.factor(fuel)+
+              as.factor(brand)*as.factor(gear) + as.factor(brand)*engine_size + as.factor(brand)*as.factor(fuel)+
+              as.factor(gear)*engine_size + as.factor(gear)*as.factor(fuel)+
+              engine_size*as.factor(fuel)
+            ,dados)
+
+qqnorm(model$residuals)
+qqline(model$residuals)
+hist(model$residuals)
+plot(model)
+
+leaps <- regsubsets(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel)+
++                age_years*as.factor(brand)+ age_years*as.factor(gear) + age_years*engine_size + age_years*as.factor(fuel)+
++                as.factor(brand)*as.factor(gear) + as.factor(brand)*engine_size + as.factor(brand)*as.factor(fuel)+
++                as.factor(gear)*engine_size + as.factor(gear)*as.factor(fuel)+
++                engine_size*as.factor(fuel), nbest = 1,nvmax = 174,data = dados,really.big = T, method = "forward")
+
+plot(leaps,scale = "cp")
+
+as.matrix(summary(leaps)) -> a
+a_matrix <- as.data.frame(a[1])
+
+plot(summary(leaps)$bic,type = "l")
+plot(summary(leaps)$rsq,type = "l")
+plot(summary(leaps)$cp,type = "l")
+plot(summary(leaps)$adjr2,type = "l")
+plot(summary(leaps)$rss, type = "l")
+```
+
+
