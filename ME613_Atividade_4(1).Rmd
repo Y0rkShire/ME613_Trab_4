@@ -6,6 +6,7 @@ output: pdf_document
 ---
 
 ```{r}
+library(car)
 library(tidyverse)
 ```
 
@@ -42,17 +43,20 @@ summary(lm(avg_price_brl/1000 ~  age_years +as.factor(brand)+ as.factor(gear) + 
 
 model <- lm(avg_price_brl ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
 
-qqnorm(model$residuals)
-qqline(model$residuals)
-hist(model$residuals)
 plot(model)
 
 model <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
+summary(model)
+
 
 qqnorm(model$residuals)
 qqline(model$residuals)
 hist(model$residuals)
 plot(model)
+
+car::vif(model)
+
+avPlots(model)
 ```
 
 ```{r}
@@ -67,6 +71,7 @@ plot(summary(leaps)$adjr2,type = "l")
 plot(summary(leaps)$rss, type = "l")
 ```
 
+
 ```{r}
 library(leaps)
 
@@ -76,6 +81,8 @@ model <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) +
               as.factor(gear)*engine_size + as.factor(gear)*as.factor(fuel)+
               engine_size*as.factor(fuel)
             ,dados)
+summary(model)
+
 
 qqnorm(model$residuals)
 qqline(model$residuals)
@@ -98,6 +105,8 @@ plot(summary(leaps)$rsq,type = "l")
 plot(summary(leaps)$cp,type = "l")
 plot(summary(leaps)$adjr2,type = "l")
 plot(summary(leaps)$rss, type = "l")
+
+## 11483-11845 é uma caminhonete nissan 6.5 15000 reais
 ```
 
 
