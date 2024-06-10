@@ -1,6 +1,6 @@
 ---
 title: "Tabela"
-author: "Danilo Felipe"
+author: "Danilo"
 date: "2024-05-22"
 output: pdf_document
 ---
@@ -8,35 +8,53 @@ output: pdf_document
 ```{r}
 library(car)
 library(tidyverse)
+library(GGally)
 ```
 
 
 ```{r setup, include=FALSE}
-temp <- read.csv("//smb/ra204244/Downloads/fipe_2022/fipe_2022.csv")
+temp <- read.csv(choose.files())
 
 ```
+
+Começamos escolhendo um mês como referência, para evitar dependência temporal.
 
 ```{r vereificação dos dados}
-dados <- temp %>% filter(month_of_reference == "November")
-
-table(dados$fuel)
-boxplot(dados$engine_size)
-boxplot(dados$year_model)
-hist(dados$avg_price_brl)
-#aqui foram analisados os dados por outliers foram validados os dados para análise
-pairs(dados[9:11])
-#apos não perceber nenhuma correlação perceptivel direta entre as variáveis assumimos independencia 
-dados <- dados[-c(3,4,6,10)]
+dados <- temp %>% dplyr::filter(month_of_reference == "November")
 ```
 
+realizamos a análise descritiva dos dados, buscando por anormalidades.
+
+```{r}
+boxplot(dados$engine_size)
+boxplot(dados$year_model)
+hist(dados$avg_price_brl) 
+```
+
+Não encontrado outliers ou comportamentos inesperados, analisamos a correlação dois a dois:
+```{r}
+#aqui foram analisados os dados por outliers foram validados os dados para análise
+ggpairs(dados[c(9,11,12)])
+#apos não perceber nenhuma correlação perceptivel direta entre as variáveis assumimos independencia 
+
+```
+
+Removemos variáveis irrelevantes para o modelo, e reclassificamos as marcas de carro considerando os principais modelos (com mais observações) e outros.
 ```{r tratamento de dados}
+dados <- dados[-c(3,4,6,10)]
+
 `%nin%` = Negate(`%in%`)
 dados$brand <- ifelse(dados$brand %nin% c("VW - VolksWagen","Fiat","GM - Chevrolet","BMW","Mercedes-Benz","Renault","Peugeot","Ford","Citroën","Audi","Hyundai","Mitsubishi"),"Alternativos",dados$brand)
+```
 
+Começando a definir os objetivos do modelo, filtramos as observações para uma faixa de preço usual no consumo médio brasileiro (até R$100 000)
+```{r tratamento de dados}
 dados <- dados %>% filter(avg_price_brl < 100000)
 #analisando carros de preço acessivel
 ```
 
+
+Inicialmente, consideramos
 
 ```{r}
 summary(lm(avg_price_brl/1000 ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados))
@@ -108,5 +126,4 @@ plot(summary(leaps)$rss, type = "l")
 
 ## 11483-11845 é uma caminhonete nissan 6.5 15000 reais
 ```
-
 
