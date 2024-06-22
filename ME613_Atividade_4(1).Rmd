@@ -3,9 +3,6 @@ title: "Coloque seu titulo aqui"
 author:
   - Aluno 1 RA
   - Aluno 2 RA
-header-includes:
-   - \usepackage[brazil]{babel}
-bibliography: referencia.bib
 output:
  bookdown::pdf_document2:
      toc: FALSE
@@ -28,6 +25,7 @@ library(car)
 library(tidyverse)
 library(GGally)
 library(leaps)
+library(gridExtra)
 ```
 
 
@@ -61,20 +59,40 @@ library(leaps)
 
 Começamos escolhendo um mês como referência, para evitar dependência temporal.
 
-```{r vereificação dos dados}
+```{r verificação dos dados}
 dados <- temp %>% dplyr::filter(month_of_reference == "November")
 ```
 
 realizamos a análise descritiva dos dados, buscando por anormalidades.
 
-```{r}
-boxplot(dados$engine_size)
-boxplot(dados$year_model)
-hist(dados$avg_price_brl) 
+```{r,plot análise descritiva, fig.height=4, fig.width=12}
+boxplot_engine_size <- ggplot(dados, aes(y = engine_size)) +
+  geom_boxplot(fill = "#FFA07A", color = "black", width = 0.3) +
+  labs(title = "Tamanho do Motor",
+       y = "tamanho do motor") +
+  theme_minimal()
+
+boxplot_year_model <- ggplot(dados, aes(y = year_model)) +
+  geom_boxplot(fill = "#FFA07A", color = "black", width = 0.3) +
+  labs(title = "Ano de Fabricação",
+       y = "ano de fabricação") +
+  theme_minimal()
+
+histogram_price <- ggplot(dados, aes(x = avg_price_brl)) +
+  geom_histogram(fill = "#FFA07A", color = "black", bins = 30,width = 0.4) +
+  labs(title = "Preço do Veículo",
+       x = "preço do veiculo",
+       y = "frequência") +
+  theme_minimal()
+
+grid.arrange(boxplot_engine_size, boxplot_year_model, histogram_price, 
+             ncol = 3, 
+             widths = c(1, 1, 2))
+
 ```
 
-Não encontrado outliers ou comportamentos inesperados, analisamos a correlação dois a dois:
-```{r}
+Não encontrado outliers ou comportamentos inesperados, partimos para a análise de correlação dois a dois:
+```{r, plot correlação dois a dois}
 #aqui foram analisados os dados por outliers foram validados os dados para análise
 ggpairs(dados[c(9,11,12)])
 #apos não perceber nenhuma correlação perceptivel direta entre as variáveis assumimos independencia 
@@ -89,30 +107,80 @@ dados <- dados[-c(3,4,6,10)]
 dados$brand <- ifelse(dados$brand %nin% c("VW - VolksWagen","Fiat","GM - Chevrolet","BMW","Mercedes-Benz","Renault","Peugeot","Ford","Citroën","Audi","Hyundai","Mitsubishi"),"Alternativos",dados$brand)
 ```
 
-Começando a definir os objetivos do modelo, filtramos as observações para uma faixa de preço usual no consumo médio brasileiro (até R$100 000)
+Começando a definir os objetivos do modelo, filtramos as observações para uma faixa de preço usual no consumo médio brasileiro (até R$100 000), e temos a seguinte distribuição da nossa variável resposta
 ```{r}
-dados <- dados %>% filter(avg_price_brl < 100000)
+dados <- dados %>% filter(avg_price_brl <= 100000)
 #analisando carros de preço acessivel
+
+ggplot(dados, aes(x = avg_price_brl)) +
+  geom_histogram(fill = "#FFA07A", color = "black", bins = 30,width = 0.4) +
+  labs(title = "Preço do Veículo",
+       x = "preço do veiculo",
+       y = "frequência") +
+  theme_minimal()
+```
+#Aplicando o modelo de regressão
+
+Feita os tratamentos de dados podemos iniciar a implementação do modelo de regressão linear multipla simples, baseado no nosso banco de dados foi escolhido as seguintes variáveis inicialmente: 
+
+## Variáveis do modelo inicial:
+
+| Categoria                    | Detalhes                                                        |
+|------------------------------|-----------------------------------------------------------------|
+| **Dummies de marca**         | Audi, BMW, Citroën, Fiat, Ford, Chevrolet, Hyundai, Mercedes-Benz, Mitsubishi, Peugeot, Renault, Volkswagen, Categoria Outros (abrange todas outras marcas) |
+| **Dummies de combustível**   | Álcool, Diesel, Gasolina                                        |
+| **Dummies de tipo de câmbio**| Manual, Automático                                              |
+| **Variável numérica**        | Tamanho do motor em centímetros cúbicos                         |
+| **Idade**                    | Idade do modelo em anos    
+              |
+| **Variável resposta Y**      | Preço médio do carro, medido pela FIPE no Brasil      
+
+```{r modelo inicial}
+model <- lm(avg_price_brl ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
 ```
 
+## Primeiro modelo
 
-Inicialmente, consideramos
+Inicialmente, consideramos o modelo mais natural \( Y_{preço} = X\beta + \epsilon \) e fizemos a análise de resíduos a partir dele para avaliar a credibilidade da análise, análisando o ajuste do modelo obtemos um \( R^2 = \) `r format(summary(model)$r.squared, digits = 3)` e \( R^2_{\text{ajustado}} = \) `r format(summary(model)$adj.r.squared, digits = 3)` e geramos os gráficos para análise de resíduos:
 
-```{r}
-summary(lm(avg_price_brl/1000 ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados))
 
-model <- lm(avg_price_brl ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
+```{r análise de residuos modelo inicial}
+par(mfrow = c(2, 2))
 
-plot(model)
+plot(model, which = 1)
+title(main = "Residuos vs Ajustados")
+plot(model, which = 2)
+title(main = "Q-Q Plot of Residuals", sub = "")
+plot(model, which = 3)
+title(main = "Scale-Location Plot", sub = "")
+plot(model, which = 5)
+title(main = "Residuals vs Leverage", sub = "")
 
+par(mfrow = c(1, 1))
+```
+
+## Segundo modelo
+
+É possivel análisar uma leve tendência dos valores dos resíduos a aumentarem conforme os valores dos quantis teóricos aumentam, beaseado nessa informação decidimos adotar uma transformação na variável resposta do modelo para melhor ajustar os valroes do resíduos a normalidade, de tal forma que o segundo modelo adotado é de seguinte forma: \( log(Y) = Y_2 = X\beta + \epsilon \) pois os valores em preço são de alta escala e assim podemos reduzir o valor crescente dos resíduos conforme os valores ajustados aumentam
+
+
+```{r segundo modelo}
 model <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
-summary(model)
 
+par(mfrow = c(2, 2))
 
-qqnorm(model$residuals)
-qqline(model$residuals)
+plot(model, which = 1)
+title(main = "Residuos vs Ajustados")
+plot(model, which = 2)
+title(main = "Q-Q Plot of Residuals", sub = "")
+plot(model, which = 3)
+title(main = "Scale-Location Plot", sub = "")
+plot(model, which = 5)
+title(main = "Residuals vs Leverage", sub = "")
+
+par(mfrow = c(1, 1))
+
 hist(model$residuals)
-plot(model)
 
 car::vif(model)
 
@@ -169,7 +237,7 @@ plot(summary(leaps)$rss, type = "l")
 ## 11483-11845 é uma caminhonete nissan 6.5 15000 reais
 ```
 
-A média da variável X é `r media`.
+A média da variável X é.
 
 # Considerações finais
 
