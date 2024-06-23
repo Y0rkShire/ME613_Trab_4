@@ -35,25 +35,21 @@ library(kableExtra)
 
 # Introdução
 
-
-
-
+ Existe um grande interesse em estudar a correlação entre características de um automóvel e o seu preço no mercado nacional. Assim, grandes áreas como seguradoras de veículo no cálculo de apólices, comerciantes de automóveis e em cálculo de tributos, desenvolve-se modelos para mensurar correlações, e até mesmo realizar predições sobre preços.
+ Tendo isso em vista, o objetivo principal do projeto foi construir um modelo que permitisse constatar as correlações entre características do carro e seu preço, tendo o ano de 2022 e o mês de novembro como referência; aliado a isso, buscamos otimizar o modelo(mesmo a custo de interpretabilidade) para obter um modelo mais acurado tendo como foco predição de novas observações. Para isso, utilizamos a tabela de dados disponibilizada publicamente pela FIPE, e extraida a partir de web scraping.
 
 # Banco de dados
 
 O banco de dados se trata de um extrato histórico da tabela FIPE, retirada do site https://veiculos.fipe.org.br ; Nos dados, temos o preço médio estimado pela FIPE de um modelo de veículo em certo mês de referência de 2022, e diversas características do exato modelo. As colunas fuel, gear e engine_size foram retiradas de uma só coluna no site, chamada modelo. Adicionalmente, se "Aut" não estava presente na coluna modelo, o carro foi assumido como manual.
 
-## Variáveis:
+## Variáveis Utilizadas:
 * year_of_reference: Ano de referência na coleta dos dados  
 * month_of_reference: Mês de referência na coleta dos dados  
-* fipe_code: ID de cada marca  
-* authentication: Código de autenticação único para cada consulta no site da FIPE.  
 * brand: Marca montadora do veículo
 * model: Nome do modelo do carro
 * fuel: Combustível do carro. Alguns dos carros indicados como gasolina são na verdade flex(gasolina+álcool)
 * gear: Tipo do câmbio.
 * engine_size: Tamanho do motor em centímetros cubicos.
-* year_model:  Corresponde ao primeiro ano de referência do carro, 1 posterior ao ano de fabricação.
 * avg_price_brl: Preço médio do carro, medido pela FIPE no Brasil.
 * age_years: Idade do modelo em anos.
 
@@ -116,7 +112,7 @@ dados$brand <- ifelse(dados$brand %nin% c("VW - VolksWagen","Fiat","GM - Chevrol
 
 Como foi descrito anteriormente os dados tem um certo problema com a distribuição dos preços do veículos, assim prosseguimos a definir um dos objetivos do modelo, filtramos as observações para uma faixa de preço usual no consumo automotivo médio brasileiro (até R$100 000), e temos uma distribuição muito mais homogênea na variável resposta que facilitará a ánalise e ajuste do modelo
 ```{r, dsitribuição preços, fig.height=4, fig.width=8}
-dados <- dados %>% filter(avg_price_brl <= 100000)
+dados <- dados %>% filter(avg_price_brl <= 300000)
 #analisando carros de preço acessivel
 
 ggplot(dados, aes(x = avg_price_brl)) +
@@ -129,7 +125,7 @@ ggplot(dados, aes(x = avg_price_brl)) +
 
 # Aplicando o modelo de regressão
 
-Feita os tratamentos de dados podemos iniciar a implementação do modelo de regressão linear multipla simples, baseado no nosso banco de dados foi escolhido as seguintes variáveis inicialmente: 
+Feita os tratamentos de dados podemos iniciar a implementação do modelo de regressão linear múltipla simples, baseado no nosso banco de dados foi escolhido as seguintes variáveis inicialmente: 
 
 ## Variáveis do modelo inicial:
 
