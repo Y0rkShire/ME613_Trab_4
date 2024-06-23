@@ -1,7 +1,7 @@
 ---
-title: "Coloque seu titulo aqui"
+title: "Análise de regressão tabela Fipe 2022"
 author:
-  - Aluno 1 RA
+  - Danilo Sucomine 204244
   - Aluno 2 RA
 output:
  bookdown::pdf_document2:
@@ -26,6 +26,7 @@ library(tidyverse)
 library(GGally)
 library(leaps)
 library(gridExtra)
+library(kableExtra)
 ```
 
 
@@ -39,7 +40,7 @@ library(gridExtra)
 
 <!-- sua conclusao a partir dos dados e recomendacoes-->
 
-### Covariáveis:
+## Covariáveis:
 * year_of_reference: Ano de referência na coleta dos dados  
 * month_of_reference: Mês de referência na coleta dos dados  
 * fipe_code: ID de cada marca  
@@ -55,15 +56,19 @@ library(gridExtra)
 
 # Análise exploratória
 
+Realizamos a análise exploratória com o objetivo de garantir o funcionamento do modelo e sua máxima eficácia para que se alinhe com nossos objetivos, fazemos a análise conjunta com o tratamento de dados antes de prosseguir para o modelo e os testes
 
+## Tratamento de dados
 
-Começamos escolhendo um mês como referência, para evitar dependência temporal.
+Como a tabela FIPE é refeita mensalmente e o banco de dados escolhido é fruto de valores de um ano inteiro, começamos escolhendo um mês como referência para análise, para evitar dependência temporal entre carros de mesmo modelos sendo avaliados novamente, devido ao fato de __novembro__ ser o mês com maior quantidade de observações esse foi o mês escolhido.
 
 ```{r verificação dos dados}
 dados <- temp %>% dplyr::filter(month_of_reference == "November")
 ```
 
-realizamos a análise descritiva dos dados, buscando por anormalidades.
+## Gráficos para análise
+
+Realizamos então a análise descritiva dos dados, buscando por anormalidades, tais como outliers, inputs errados, dados faltantes etc que podem afetar o funcionamento do modelo com o decorrer do processo:
 
 ```{r,plot análise descritiva, fig.height=4, fig.width=12}
 boxplot_engine_size <- ggplot(dados, aes(y = engine_size)) +
@@ -88,18 +93,17 @@ histogram_price <- ggplot(dados, aes(x = avg_price_brl)) +
 grid.arrange(boxplot_engine_size, boxplot_year_model, histogram_price, 
              ncol = 3, 
              widths = c(1, 1, 2))
-
 ```
 
-Não encontrado outliers ou comportamentos inesperados, partimos para a análise de correlação dois a dois:
-```{r, plot correlação dois a dois}
+Podemos observar a distribuição disproporcional nos valores de preço do veículo,isso será tratado mais a frente no trabalho,seguindo a análise, não encontrado nenhum outliers (desvio da média maior que 4 desvios padrões) ou comportamentos inesperados das váriaveis numéricas, partimos para a análise de correlação dois a dois:
+```{r, plot correlação dois a dois, fig.height= 3, fig.width= 3 }
 #aqui foram analisados os dados por outliers foram validados os dados para análise
 ggpairs(dados[c(9,11,12)])
 #apos não perceber nenhuma correlação perceptivel direta entre as variáveis assumimos independencia 
 
 ```
 
-Removemos variáveis irrelevantes para o modelo, e reclassificamos as marcas de carro considerando os principais modelos (com mais observações) e outros.
+Removemos variáveis irrelevantes para o modelo (Nome do modelo,Código na tabela FIPE,código de autentificação, etc.) pois não se pode fazer infêrencia com esses dados, e reclassificamos as marcas de carro considerando as principais marcas no pais (com mais observações) e os carros das marcas faltantes foram agrupados em "Marcas Alternativas".
 ```{r tratamento de dados}
 dados <- dados[-c(3,4,6,10)]
 
@@ -107,8 +111,8 @@ dados <- dados[-c(3,4,6,10)]
 dados$brand <- ifelse(dados$brand %nin% c("VW - VolksWagen","Fiat","GM - Chevrolet","BMW","Mercedes-Benz","Renault","Peugeot","Ford","Citroën","Audi","Hyundai","Mitsubishi"),"Alternativos",dados$brand)
 ```
 
-Começando a definir os objetivos do modelo, filtramos as observações para uma faixa de preço usual no consumo médio brasileiro (até R$100 000), e temos a seguinte distribuição da nossa variável resposta
-```{r}
+Como foi descrito anteriormente os dados tem um certo problema com a distribuição dos preços do veículos, assim prosseguimos a definir um dos objetivos do modelo, filtramos as observações para uma faixa de preço usual no consumo automotivo médio brasileiro (até R$100 000), e temos uma distribuição muito mais homogênea na variável resposta que facilitará a ánalise e ajuste do modelo
+```{r, dsitribuição preços, fig.height=4, fig.width=8}
 dados <- dados %>% filter(avg_price_brl <= 100000)
 #analisando carros de preço acessivel
 
@@ -119,7 +123,8 @@ ggplot(dados, aes(x = avg_price_brl)) +
        y = "frequência") +
   theme_minimal()
 ```
-#Aplicando o modelo de regressão
+
+# Aplicando o modelo de regressão
 
 Feita os tratamentos de dados podemos iniciar a implementação do modelo de regressão linear multipla simples, baseado no nosso banco de dados foi escolhido as seguintes variáveis inicialmente: 
 
@@ -130,8 +135,8 @@ Feita os tratamentos de dados podemos iniciar a implementação do modelo de reg
 | **Dummies de marca**         | Audi, BMW, Citroën, Fiat, Ford, Chevrolet, Hyundai, Mercedes-Benz, Mitsubishi, Peugeot, Renault, Volkswagen, Categoria Outros (abrange todas outras marcas) |
 | **Dummies de combustível**   | Álcool, Diesel, Gasolina                                        |
 | **Dummies de tipo de câmbio**| Manual, Automático                                              |
-| **Variável numérica**        | Tamanho do motor em centímetros cúbicos                         |
-| **Idade**                    | Idade do modelo em anos    
+| **Variável numérica do motor**        | Tamanho do motor em centímetros cúbicos                         |
+| **Variável numérica de Idade**                    | Idade do modelo em anos    
               |
 | **Variável resposta Y**      | Preço médio do carro, medido pela FIPE no Brasil      
 
@@ -147,75 +152,121 @@ Inicialmente, consideramos o modelo mais natural \( Y_{preço} = X\beta + \epsil
 ```{r análise de residuos modelo inicial}
 par(mfrow = c(2, 2))
 
-plot(model, which = 1)
-title(main = "Residuos vs Ajustados")
-plot(model, which = 2)
-title(main = "Q-Q Plot of Residuals", sub = "")
-plot(model, which = 3)
-title(main = "Scale-Location Plot", sub = "")
-plot(model, which = 5)
-title(main = "Residuals vs Leverage", sub = "")
+plot(model, which = 1,ann = F,sub="")
+title(main = "Residuos vs Ajustados", ylab = "Resíduos", xlab = "Ajustados")
+plot(model, which = 2,ann = F)
+title(main = "Q-Q Plot dos Residuos", sub = "")
+plot(model, which = 3,ann = F)
+title(main = "Plot Escala-Locação", sub = "", ylab = "Escala", xlab = "Ajustados")
+plot(model, which = 5,ann = F)
+title(main = "Residuos vs Alavanca", sub = "", ylab = "Resíduos", xlab = "Alavanca")
 
 par(mfrow = c(1, 1))
 ```
 
 ## Segundo modelo
 
-É possivel análisar uma leve tendência dos valores dos resíduos a aumentarem conforme os valores dos quantis teóricos aumentam, beaseado nessa informação decidimos adotar uma transformação na variável resposta do modelo para melhor ajustar os valroes do resíduos a normalidade, de tal forma que o segundo modelo adotado é de seguinte forma: \( log(Y) = Y_2 = X\beta + \epsilon \) pois os valores em preço são de alta escala e assim podemos reduzir o valor crescente dos resíduos conforme os valores ajustados aumentam
-
-
 ```{r segundo modelo}
 model <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
+```
 
+Apesar do ajuste estar razoavelmente bom,é possivel análisar uma leve tendência dos valores dos resíduos a aumentarem conforme os valores dos quantis teóricos aumentam, beaseado nessa informação decidimos aplicar os conhecimentos desenvolvidos durante o escopo da matéria e adotar uma transformação na variável resposta do modelo para melhor ajustar os valores do resíduos a normalidade, de tal forma que o segundo modelo adotado é o seguinte: \( log(Y) = Y_2 = X\beta + \epsilon \) pois os valores da varíavel resposta (preço) são de alta escala (milhares de reais) e assim podemos reduzir o valor crescente dos resíduos conforme os valores ajustados aumentam ao custo de parte da interpretabilidade do modelo, o novo modelo tem \( R^2 = \) `r format(summary(model)$r.squared, digits = 3)` e \( R^2_{\text{ajustado}} = \) `r format(summary(model)$adj.r.squared, digits = 3)`
+
+```{r plots de residuos segundo modelo}
 par(mfrow = c(2, 2))
 
-plot(model, which = 1)
-title(main = "Residuos vs Ajustados")
-plot(model, which = 2)
-title(main = "Q-Q Plot of Residuals", sub = "")
-plot(model, which = 3)
-title(main = "Scale-Location Plot", sub = "")
-plot(model, which = 5)
-title(main = "Residuals vs Leverage", sub = "")
+plot(model, which = 1,ann = F,sub="")
+title(main = "Residuos vs Ajustados", ylab = "Resíduos", xlab = "Ajustados")
+plot(model, which = 2,ann = F)
+title(main = "Q-Q Plot dos Residuos", sub = "")
+plot(model, which = 3,ann = F)
+title(main = "Plot Escala-Locação", sub = "", ylab = "Escala", xlab = "Ajustados")
+plot(model, which = 5,ann = F)
+title(main = "Residuos vs Alavanca", sub = "", ylab = "Resíduos", xlab = "Alavanca")
 
 par(mfrow = c(1, 1))
 
-hist(model$residuals)
-
-car::vif(model)
-
-avPlots(model)
+hist(model$residuals,main = "Histograma dos Residuos do modelo",ylab = "Frequência",xlab = "Residuos do modelo")
 ```
 
-```{r}
-leaps <- regsubsets(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel), nbest= 1,data = dados,nvmax = 18)
+## Análise das váriaveis do modelo
 
-plot(leaps,scale = "bic")
+Como pode ser análisado os valores de \(R^2 e R^2_{ajustado} \) melhoraram e os gráficos de reziduos também apresentam formas que indicam melhor ajuste dos residuos a normalidade, assim prosseguimos para a análise das variáveis \( X \) do modelo, calculamos os valores de VIF *Variance Inflation Factor* para avaliar a multicolinearidade das varáveis do modelo, valroes altos (acima de 10) indicariam que existe multicolinearidade entre as variáveis.
+```{r VIF segundo modelo,warning=FALSE}
+vif_values <- car::vif(model)
 
-plot(summary(leaps)$bic,type = "l")
-plot(summary(leaps)$rsq,type = "l")
-plot(summary(leaps)$cp,type = "l")
-plot(summary(leaps)$adjr2,type = "l")
-plot(summary(leaps)$rss, type = "l")
+vif_df <- data.frame(VIF = round(vif_values, 2))
+
+kable(vif_df, "simple") %>%
+  kable_styling(full_width = FALSE)
 ```
 
+Como pode ser observado, nenhum valor de VIF excede 10 ou ao menos chega próximo desse limite. Dessa forma, podemos concluir que não há evidências substanciais de multicolinearidade entre as variáveis independentes no modelo. Para uma validação visual adicional da multicolinearidade, utilizaremos os gráficos de efeitos parciais. Esses gráficos relacionam os resíduos do modelo, ou seja, as diferenças entre os valores observados e os valores preditos pelo modelo, com as variáveis independentes, permitindo uma análise mais detalhada da relação entre as variáveis e os erros do modelo.
+Lembrando que os gráficos só tem interpretação válida para váriaveis numéricas, como nosso modelo possui apenas duas:
+
+```{r avPlot segundo modelo}
+par(mfrow = c(1, 2))
+
+avPlots(model, "age_years")
+avPlots(model,"engine_size")
+
+par(mfrow = c(1,1))
+```
+
+Após a análise dos gráficos de efeitos parciais gerados para o modelo, podemos concluir que não há evidências substanciais de multicolinearidade entre as variáveis independentes. Os gráficos mostram padrões consistentes e não indicam relacionamentos lineares fortes ou interdependências significativas entre as variáveis. Isso sugere que as variáveis independentes contribuem de forma independente para a explicação da variável de resposta no modelo, fortalecendo a confiabilidade e interpretabilidade dos resultados obtidos. Dessa forma, podemos prosseguir com confiança para a análise mais aprofundada dos efeitos individuais das variáveis independentes sobre a variável dependente, sem preocupações substanciais com multicolinearidade.
+
+Para finalizar a análise das variáveis que já estavam contidas no modelo realizaremos calculos das estatisticas de seleção de modelos tais como BIC,CP de Mellow,R quadrado,R quadrado ajustado,Soma de residuos quadrada, considerando o equilíbrio entre o ajuste do modelo, sua complexidade e a capacidade de explicar a variabilidade na variável de resposta
 
 ```{r}
-library(leaps)
+leaps <- regsubsets(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel), nbest= 1,data = dados,nvmax = 17,really.big = T)
 
-model <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel)+
+par(mfrow = c(2, 3))
+
+plot(summary(leaps)$bic, type = "l", main = "BIC Plot", xlab = "Number de Variaveis", ylab = "Valor BIC")
+
+plot(summary(leaps)$rsq, type = "l", main = "Plot R-Quadrado", xlab = "Numero de Variáveis", ylab = "R-Quadrado")
+
+plot(summary(leaps)$cp, type = "l", main = "Cp Plot", xlab ="Numero de Variáveis", ylab = "Valor CP")
+
+plot(summary(leaps)$adjr2, type = "l", main = "Plot R-Qaudrado Ajustado", xlab = "Numero de Variáveis", ylab = "R-Qaudrado Ajustado")
+
+plot(summary(leaps)$rss, type = "l", main = "RSS Plot", xlab = "Numero de Variáveis", ylab = "Valor RSS")
+
+par(mfrow = c(1, 1))
+```
+
+Como pode-se observar os valores são semelhantes para todos os testes, o que serve de forte indício que adotado um certo nº de variáveis teremos resultados semelhantes das diversas estatísticas para validação de escolha de variáveis.
+
+## Análise das variáveis de interação de um grau \(X_1X_2\)
+
+```{r modelo com interações}
+model_interacoes <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel)+
               age_years*as.factor(brand)+ age_years*as.factor(gear) + age_years*engine_size + age_years*as.factor(fuel)+
               as.factor(brand)*as.factor(gear) + as.factor(brand)*engine_size + as.factor(brand)*as.factor(fuel)+
               as.factor(gear)*engine_size + as.factor(gear)*as.factor(fuel)+
               engine_size*as.factor(fuel)
             ,dados)
-summary(model)
+```
 
+A última coisa que veremos em relação a otimização do modelo será a verificação da interação entre variáveis, apesar da análise de multicolinearidade ser forte indicio para independencia das variáveis, os testes com váriaveis de interação \( X_i X_j \) são necessários para eliminar possíveis residuos que estejam sendo menosprezados pelo modelo sem interação
 
-qqnorm(model$residuals)
-qqline(model$residuals)
-hist(model$residuals)
-plot(model)
+O modelo com todas as interações teve um \( R^2 = \) `r format(summary(model)$r.squared, digits = 3)` e \( R^2_{\text{ajustado}} = \) `r format(summary(model)$adj.r.squared, digits = 3)` , o fato dos valores não terem nem alterado já é um possível indicador de que a adição de fatores de interação no modelo não ajudem a reduzir nem explicar parte dos resíduos do modelo, porém podemos realizar os mesmos testes que fizemos ao decorrer do trabalho para validar o modelo com a inserção das váriaveis de interação
+
+```{r,warning=FALSE}
+hist(model_interacoes$residuals, main = "Residuos modelo com interações",ylab = "Frequência",xlab = "Residuos")
+
+par(mfrow = c(2, 2))
+
+plot(model_interacoes, which = 1,ann = F,sub="")
+title(main = "Residuos vs Ajustados", ylab = "Resíduos", xlab = "Ajustados")
+plot(model_interacoes, which = 2,ann = F)
+title(main = "Q-Q Plot dos Residuos", sub = "")
+plot(model_interacoes, which = 3,ann = F)
+title(main = "Plot Escala-Locação", sub = "", ylab = "Escala", xlab = "Ajustados")
+plot(model_interacoes, which = 5,ann = F)
+title(main = "Residuos vs Alavanca", sub = "", ylab = "Resíduos", xlab = "Alavanca")
+
+par(mfrow = c(1, 1))
 
 leaps <- regsubsets(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel)+
 +                age_years*as.factor(brand)+ age_years*as.factor(gear) + age_years*engine_size + age_years*as.factor(fuel)+
@@ -223,21 +274,43 @@ leaps <- regsubsets(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor
 +                as.factor(gear)*engine_size + as.factor(gear)*as.factor(fuel)+
 +                engine_size*as.factor(fuel), nbest = 1,nvmax = 174,data = dados,really.big = T, method = "forward")
 
-plot(leaps,scale = "Cp")
 
-as.matrix(summary(leaps)) -> a
-a_matrix <- as.data.frame(a[1])
 
-plot(summary(leaps)$bic,type = "l")
-plot(summary(leaps)$rsq,type = "l")
-plot(summary(leaps)$cp,type = "l")
-plot(summary(leaps)$adjr2,type = "l")
-plot(summary(leaps)$rss, type = "l")
+par(mfrow = c(2, 3))
 
+plot(summary(leaps)$bic, type = "l", main = "BIC Plot", xlab = "Number de Variaveis", ylab = "Valor BIC")
+
+plot(summary(leaps)$rsq, type = "l", main = "Plot R-Quadrado", xlab = "Numero de Variáveis", ylab = "R-Quadrado")
+
+plot(summary(leaps)$cp, type = "l", main = "Cp Plot", xlab ="Numero de Variáveis", ylab = "Valor CP")
+
+plot(summary(leaps)$adjr2, type = "l", main = "Plot R-Qaudrado Ajustado", xlab = "Numero de Variáveis", ylab = "R-Qaudrado Ajustado")
+
+plot(summary(leaps)$rss, type = "l", main = "RSS Plot", xlab = "Numero de Variáveis", ylab = "Valor RSS")
+
+par(mfrow = c(1, 1))
 ## 11483-11845 é uma caminhonete nissan 6.5 15000 reais
 ```
 
-A média da variável X é.
+Como é possível inferir, a distribuição dos residuos continua a mesma, os plots de avaliação da normalidade e homoscedasticidade do resíduo continuam as mesmas,sem muitas alterações,podemos também checkar o _plateau_ que chega os valores das estatisticas que medem qualidade de ajuste de modelo após \( \approx 25 \), o que nos levam a concluir gráficamente que a inclusão não afetará significantemente os residuos do modelo porém a adição de um set de variáveis de interação com as marcas de veículos pode ajudar o modelo caso julgado necessário, para avaliar melhor isso segue os p-valores dos testes F de cada variável de interação e seus valores estimados:
+
+```{r}
+model_summary <- summary(model_interacoes)
+
+interaction_p_values <- model_summary$coefficients[grep(":|\\*", rownames(model_summary$coefficients)), "Pr(>|t|)"]
+interaction_estimates <- model_summary$coefficients[grep(":|\\*", rownames(model_summary$coefficients)), "Estimate"]
+
+interaction_estimates <- round(interaction_estimates, digits = 4)
+
+p_values_table <- data.frame(P_Value = interaction_p_values)
+p_values_table$P_Value <- round(p_values_table$P_Value, digits = 4)
+p_values_table$Estimate <- interaction_estimates
+
+hist(interaction_p_values)
+p_values_table
+```
+
+Surpreendentemente muitas variáveis tem p-valores menores do que o 0.05 estipulado como limiar de significância, isso indica que dada uma análise mais meticulosa da relação interativa entre as variáveis, principalmente idade dos veiculos e as marcas, onde a maioria teve p-valor menor que 0.05 e não conteve valores NAs como \( X_{combustivel} X_{marca}\) tiveram
 
 # Considerações finais
 
