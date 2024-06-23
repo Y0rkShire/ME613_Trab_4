@@ -1,8 +1,8 @@
 ---
 title: "Análise de regressão tabela Fipe 2022"
 author:
-  - Danilo Sucomine 204244
-  - Aluno 2 RA
+  - Danilo Sucomine Carreira 204244
+  - Felipe Camilo de Queiroz 222006
 output:
  bookdown::pdf_document2:
      toc: FALSE
@@ -96,7 +96,7 @@ grid.arrange(boxplot_engine_size, boxplot_year_model, histogram_price,
 ```
 
 Podemos observar a distribuição disproporcional nos valores de preço do veículo,isso será tratado mais a frente no trabalho,seguindo a análise, não encontrado nenhum outliers (desvio da média maior que 4 desvios padrões) ou comportamentos inesperados das váriaveis numéricas, partimos para a análise de correlação dois a dois:
-```{r, plot correlação dois a dois, fig.height= 3, fig.width= 3 }
+```{r, plot correlação dois a dois, fig.height= 4, fig.width= 4 }
 #aqui foram analisados os dados por outliers foram validados os dados para análise
 ggpairs(dados[c(9,11,12)])
 #apos não perceber nenhuma correlação perceptivel direta entre as variáveis assumimos independencia 
@@ -146,7 +146,7 @@ model <- lm(avg_price_brl ~  age_years +as.factor(brand)+ as.factor(gear) + engi
 
 ## Primeiro modelo
 
-Inicialmente, consideramos o modelo mais natural \( Y_{preço} = X\beta + \epsilon \) e fizemos a análise de resíduos a partir dele para avaliar a credibilidade da análise, análisando o ajuste do modelo obtemos um \( R^2 = \) `r format(summary(model)$r.squared, digits = 3)` e \( R^2_{\text{ajustado}} = \) `r format(summary(model)$adj.r.squared, digits = 3)` e geramos os gráficos para análise de resíduos:
+Inicialmente, consideramos o modelo mais natural \( Y_{valor} = X\beta + \epsilon \) e fizemos a análise de resíduos a partir dele para avaliar a credibilidade da análise, análisando o ajuste do modelo obtemos um \( R^2 = \) `r format(summary(model)$r.squared, digits = 3)` e \( R^2_{\text{ajustado}} = \) `r format(summary(model)$adj.r.squared, digits = 3)` e geramos os gráficos para análise de resíduos:
 
 
 ```{r análise de residuos modelo inicial}
@@ -185,7 +185,10 @@ plot(model, which = 5,ann = F)
 title(main = "Residuos vs Alavanca", sub = "", ylab = "Resíduos", xlab = "Alavanca")
 
 par(mfrow = c(1, 1))
+```
 
+
+```{r histograma de residuos segundo modelo,fig.height=3,fig.width=5}
 hist(model$residuals,main = "Histograma dos Residuos do modelo",ylab = "Frequência",xlab = "Residuos do modelo")
 ```
 
@@ -252,9 +255,12 @@ A última coisa que veremos em relação a otimização do modelo será a verifi
 
 O modelo com todas as interações teve um \( R^2 = \) `r format(summary(model)$r.squared, digits = 3)` e \( R^2_{\text{ajustado}} = \) `r format(summary(model)$adj.r.squared, digits = 3)` , o fato dos valores não terem nem alterado já é um possível indicador de que a adição de fatores de interação no modelo não ajudem a reduzir nem explicar parte dos resíduos do modelo, porém podemos realizar os mesmos testes que fizemos ao decorrer do trabalho para validar o modelo com a inserção das váriaveis de interação
 
-```{r,warning=FALSE}
+```{r,warning=FALSE,fig.height= 4,fig.width= 6}
 hist(model_interacoes$residuals, main = "Residuos modelo com interações",ylab = "Frequência",xlab = "Residuos")
+```
 
+
+```{r,warning=FALSE,message=FALSE}
 par(mfrow = c(2, 2))
 
 plot(model_interacoes, which = 1,ann = F,sub="")
@@ -292,9 +298,9 @@ par(mfrow = c(1, 1))
 ## 11483-11845 é uma caminhonete nissan 6.5 15000 reais
 ```
 
-Como é possível inferir, a distribuição dos residuos continua a mesma, os plots de avaliação da normalidade e homoscedasticidade do resíduo continuam as mesmas,sem muitas alterações,podemos também checkar o _plateau_ que chega os valores das estatisticas que medem qualidade de ajuste de modelo após \( \approx 25 \), o que nos levam a concluir gráficamente que a inclusão não afetará significantemente os residuos do modelo porém a adição de um set de variáveis de interação com as marcas de veículos pode ajudar o modelo caso julgado necessário, para avaliar melhor isso segue os p-valores dos testes F de cada variável de interação e seus valores estimados:
+Como é possível inferir, a distribuição dos resíduos continua a mesma, os plots de avaliação da normalidade e homoscedasticidade do resíduo continuam as mesmas,sem muitas alterações,podemos também checkar o _plateau_ que chega os valores das estatisticas que medem qualidade de ajuste de modelo após \( \approx 25 \), o que nos levam a concluir gráficamente que a inclusão não afetará significantemente os residuos do modelo porém a adição de um set de variáveis de interação com as marcas de veículos pode ajudar o modelo caso julgado necessário, para avaliar melhor isso segue os p-valores dos testes F de cada variável de interação e seus valores estimados:
 
-```{r}
+```{r,warning=FALSE,fig.height=3,fig.width=5}
 model_summary <- summary(model_interacoes)
 
 interaction_p_values <- model_summary$coefficients[grep(":|\\*", rownames(model_summary$coefficients)), "Pr(>|t|)"]
@@ -302,17 +308,20 @@ interaction_estimates <- model_summary$coefficients[grep(":|\\*", rownames(model
 
 interaction_estimates <- round(interaction_estimates, digits = 4)
 
-p_values_table <- data.frame(P_Value = interaction_p_values)
-p_values_table$P_Value <- round(p_values_table$P_Value, digits = 4)
-p_values_table$Estimate <- interaction_estimates
+p_values_table <- data.frame(P_Valor = interaction_p_values)
+p_values_table$P_Valor <- round(p_values_table$P_Valor, digits = 4)
+p_values_table$Estimado <- round(interaction_estimates,digits = 4)
 
-hist(interaction_p_values)
-p_values_table
+hist(interaction_p_values, main = "Distribuição dos p-valores das interações",ylab = "frequência",xlab = "p-valores")
+kable(p_values_table,format = "simple")%>%
+  kable_styling(full_width = FALSE)
 ```
 
-Surpreendentemente muitas variáveis tem p-valores menores do que o 0.05 estipulado como limiar de significância, isso indica que dada uma análise mais meticulosa da relação interativa entre as variáveis, principalmente idade dos veiculos e as marcas, onde a maioria teve p-valor menor que 0.05 e não conteve valores NAs como \( X_{combustivel} X_{marca}\) tiveram
+Surpreendentemente muitas variáveis tem p-valores menores do que o 0.05 estipulado como limiar de significância, isso indica que dada uma análise mais meticulosa da relação interativa entre as variáveis, podemos considerar em adicionar variáveis interativas ao modelo que ajudem a explicar melhor alguns desvios dos resíduos,como por exemplo nas interações \( X_{marca} X_{idade} \) onde a maioria teve p-valor menor que 0.05,valores estimados significativos e não conteve valores faltates como a variável \( X_{combustivel} X_{marca} \) tiveram.
 
 # Considerações finais
+
+## Comentários
 
 <!-- sua conclusao a partir dos dados e recomendacoes-->
 
