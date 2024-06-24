@@ -30,6 +30,7 @@ library(GGally)
 library(leaps)
 library(gridExtra)
 library(kableExtra)
+library(ggplot2)
 ```
 
 
@@ -42,22 +43,22 @@ library(kableExtra)
 
 O banco de dados se trata de um extrato histórico da tabela FIPE, retirada do site https://veiculos.fipe.org.br ; Nos dados, temos o preço médio estimado pela FIPE de um modelo de veículo em certo mês de referência de 2022, e diversas características do exato modelo. As colunas fuel, gear e engine_size foram retiradas de uma só coluna no site, chamada modelo. Adicionalmente, se "Aut" não estava presente na coluna modelo, o carro foi assumido como manual.
 
-## Variáveis Utilizadas:
-* year_of_reference: Ano de referência na coleta dos dados  
-* month_of_reference: Mês de referência na coleta dos dados  
-* brand: Marca montadora do veículo
-* model: Nome do modelo do carro
-* fuel: Combustível do carro. Alguns dos carros indicados como gasolina são na verdade flex(gasolina+álcool)
-* gear: Tipo do câmbio.
-* engine_size: Tamanho do motor em centímetros cubicos.
-* avg_price_brl: Preço médio do carro, medido pela FIPE no Brasil.
-* age_years: Idade do modelo em anos.
+#### Variáveis Utilizadas:
+* `year_of_reference:` Ano de referência na coleta dos dados  
+* `month_of_reference:` Mês de referência na coleta dos dados  
+* `brand:` Marca montadora do veículo
+* `model:` Nome do modelo do carro
+* `fuel:` Combustível do carro. Alguns dos carros indicados como gasolina são na verdade flex(gasolina+álcool)
+* `gear:` Tipo do câmbio.
+* `engine_size:` Tamanho do motor em centímetros cubicos.
+* `avg_price_brl:` Preço médio do carro, medido pela FIPE no Brasil.
+* `age_years:` Idade do modelo em anos.
 
 # Análise exploratória
 
 Realizamos a análise exploratória com o objetivo de garantir o funcionamento do modelo e sua máxima eficácia para que se alinhe com nossos objetivos, fazemos a análise conjunta com o tratamento de dados antes de prosseguir para o modelo e os testes
 
-## Tratamento de dados
+#### Tratamento de dados
 
 Como a tabela FIPE é refeita mensalmente e o banco de dados escolhido é fruto de valores de um ano inteiro, começamos escolhendo um mês como referência para análise, para evitar dependência temporal entre carros de mesmo modelos sendo avaliados novamente, devido ao fato de __novembro__ ser o mês com maior quantidade de observações esse foi o mês escolhido.
 
@@ -65,7 +66,7 @@ Como a tabela FIPE é refeita mensalmente e o banco de dados escolhido é fruto 
 dados <- temp %>% dplyr::filter(month_of_reference == "November")
 ```
 
-## Gráficos para análise
+#### Gráficos para análise
 
 Realizamos então a análise descritiva dos dados, buscando por anormalidades, tais como outliers, inputs errados, dados faltantes etc que podem afetar o funcionamento do modelo com o decorrer do processo:
 
@@ -105,13 +106,14 @@ ggpairs(dados[c(9,11,12)])
 Removemos variáveis irrelevantes para o modelo (Nome do modelo,Código na tabela FIPE,código de autentificação, etc.) pois não se pode fazer infêrencia com esses dados, e reclassificamos as marcas de carro considerando as principais marcas no país (com mais observações) e os carros das marcas faltantes foram agrupados em "Marcas Alternativas".
 ```{r tratamento de dados}
 dados <- dados[-c(3,4,6,10)]
+dados_predicao <- dados
 
 `%nin%` = Negate(`%in%`)
 dados$brand <- ifelse(dados$brand %nin% c("VW - VolksWagen","Fiat","GM - Chevrolet","BMW","Mercedes-Benz","Renault","Peugeot","Ford","Citroën","Audi","Hyundai","Mitsubishi"),"Alternativos",dados$brand)
 ```
 
 Como foi descrito anteriormente os dados tem um certo problema com a distribuição dos preços do veículos, assim prosseguimos a definir um dos objetivos do modelo, filtramos as observações para uma faixa de preço usual no consumo automotivo médio brasileiro (até R$100 000), e temos uma distribuição muito mais homogênea na variável resposta que facilitará a ánalise e ajuste do modelo
-```{r, dsitribuição preços, fig.height=4, fig.width=8}
+```{r, distribuição preços, fig.height=4, fig.width=8}
 dados <- dados %>% filter(avg_price_brl <= 300000)
 #analisando carros de preço acessivel
 
@@ -123,11 +125,20 @@ ggplot(dados, aes(x = avg_price_brl)) +
   theme_minimal()
 ```
 
+```{r, validação cruzada}
+linhas <- sample(1:nrow(dados),round(0.2 * nrow(dados)))
+validacao <- dados[linhas,]
+validacao2 <- dados_predicao[linhas,]
+
+dados <- dados[-linhas,]
+dados_predicao[-linhas,]
+```
+
 # Aplicando o modelo de regressão
 
 Feita os tratamentos de dados podemos iniciar a implementação do modelo de regressão linear múltipla simples, baseado no nosso banco de dados foi escolhido as seguintes variáveis inicialmente: 
 
-## Variáveis do modelo inicial:
+#### Variáveis do modelo inicial:
 
 | Categoria                    | Detalhes                                                        |
 |------------------------------|-----------------------------------------------------------------|
@@ -143,7 +154,7 @@ Feita os tratamentos de dados podemos iniciar a implementação do modelo de reg
 model <- lm(avg_price_brl ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
 ```
 
-## Primeiro modelo
+#### Primeiro modelo
 
 Inicialmente, consideramos o modelo mais natural \( Y_{valor} = X\beta + \epsilon \) e fizemos a análise de resíduos a partir dele para avaliar a credibilidade da análise, análisando o ajuste do modelo obtemos um \( R^2 = \) `r format(summary(model)$r.squared, digits = 3)` e \( R^2_{\text{ajustado}} = \) `r format(summary(model)$adj.r.squared, digits = 3)` e geramos os gráficos para análise de resíduos:
 
@@ -163,7 +174,7 @@ title(main = "Residuos vs Alavanca", sub = "", ylab = "Resíduos", xlab = "Alava
 par(mfrow = c(1, 1))
 ```
 
-## Segundo modelo
+#### Segundo modelo
 
 ```{r segundo modelo}
 model <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
@@ -191,7 +202,7 @@ par(mfrow = c(1, 1))
 hist(model$residuals,main = "Histograma dos Residuos do modelo",ylab = "Frequência",xlab = "Residuos do modelo")
 ```
 
-## Análise das váriaveis do modelo
+#### Análise das váriaveis do modelo
 
 Como pode ser analisado os valores de \(R^2 e R^2_{ajustado} \) melhoraram e os gráficos de resíduos também apresentam formas que indicam melhor ajuste dos resíduos a normalidade, assim prosseguimos para a análise das variáveis \( X \) do modelo, calculamos os valores de VIF *Variance Inflation Factor* para avaliar a multicolinearidade das varáveis do modelo, valoroes altos (acima de 10) indicariam que existe multicolinearidade entre as variáveis.
 ```{r VIF segundo modelo,warning=FALSE}
@@ -239,7 +250,46 @@ par(mfrow = c(1, 1))
 
 Como pode-se observar os valores são semelhantes para todos os testes, o que serve de forte indício que adotado um certo nº de variáveis teremos resultados semelhantes das diversas estatísticas para validação de escolha de variáveis.
 
-## Análise das variáveis de interação de um grau \(X_1X_2\)
+A estimativa e os p-valores foram:
+```{r}
+model_summary <- summary(model)
+
+todos_p_valor <- model_summary$coefficients[, "Pr(>|t|)"]
+todos_estimados <- model_summary$coefficients[, "Estimate"]
+
+todos_estimados <- round(todos_estimados, digits = 5)
+
+final_tabela <- data.frame(
+  P_Valor = round(todos_p_valor, digits = 5),
+  Estimado = todos_estimados
+)
+
+kable(final_tabela, format = "html") %>%
+  kable_styling(latex_options = "scale_down") %>%
+  row_spec(0, bold = TRUE, font_size = 10)
+```
+
+Por fim, observamos a acurácia do modelo sob a validação cruzada em intervalos de predição de 95%, utilizando como preditores observações separadas no inicio da análise:
+
+```{r predição 1, message=FALSE, warning=FALSE}
+intervalos_predicao <- predict(model,validacao, interval = "prediction")
+
+predicao <- data.frame(intervalos_predicao,true_value = log(validacao$avg_price_brl))
+
+acertos <- ifelse(predicao$true_value < predicao$upr & predicao$true_value > predicao$lwr,1,0)
+
+tibble(acertou = ifelse(acertos == 1,"Sim","Não")) %>% ggplot(aes(x = acertou, fill = acertou))+
+  geom_bar()+
+  labs(title = "Contagem de erros x acertos dos intervalos de predição", y = "Contagem")+
+  theme_minimal()
+
+acuracia <- mean(acertos) *100
+
+```
+
+Utilizando este modelo, obtemos uma acurácia de `r acuracia`%.
+
+#### Análise das variáveis de interação de um grau \(X_1X_2\)
 
 ```{r modelo com interações}
 model_interacoes <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel)+
@@ -247,12 +297,12 @@ model_interacoes <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.fac
               as.factor(brand)*as.factor(gear) + as.factor(brand)*engine_size + as.factor(brand)*as.factor(fuel)+
               as.factor(gear)*engine_size + as.factor(gear)*as.factor(fuel)+
               engine_size*as.factor(fuel)
-            ,dados)
+            ,dados_predicao)
 ```
 
-A última coisa que veremos em relação a otimização do modelo será a verificação da interação entre variáveis, apesar da análise de multicolinearidade ser forte indício para independência das variáveis, os testes com váriaveis de interação \( X_i X_j \) são necessários para eliminar possíveis resíduos que estejam sendo menosprezados pelo modelo sem interação
+A última coisa que veremos em relação a otimização do modelo será a verificação da interação entre variáveis, apesar da análise de multicolinearidade ser forte indício para independência das variáveis, os testes com váriaveis de interação \( X_i X_j \) são necessários para eliminar possíveis resíduos que estejam sendo menosprezados pelo modelo sem interação. Com o foco em predição, utilizaremos todas as dummies da váriavel categórica brand, e todas as interações de primeira ordem.
 
-O modelo com todas as interações teve um \( R^2 = \) `r format(summary(model)$r.squared, digits = 3)` e \( R^2_{\text{ajustado}} = \) `r format(summary(model)$adj.r.squared, digits = 3)` , o fato dos valores não terem nem alterado já é um possível indicador de que a adição de fatores de interação no modelo não ajudem a reduzir nem explicar parte dos resíduos do modelo, porém podemos realizar os mesmos testes que fizemos ao decorrer do trabalho para validar o modelo com a inserção das váriaveis de interação
+O modelo com todas as interações teve um \( R^2 = \) `r format(summary(model_interacoes)$r.squared, digits = 3)` e \( R^2_{\text{ajustado}} = \) `r format(summary(model_interacoes)$adj.r.squared, digits = 3)` 
 
 ```{r,warning=FALSE,fig.height= 4,fig.width= 6}
 hist(model_interacoes$residuals, main = "Residuos modelo com interações",ylab = "Frequência",xlab = "Residuos")
@@ -277,7 +327,7 @@ leaps <- regsubsets(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor
 +                age_years*as.factor(brand)+ age_years*as.factor(gear) + age_years*engine_size + age_years*as.factor(fuel)+
 +                as.factor(brand)*as.factor(gear) + as.factor(brand)*engine_size + as.factor(brand)*as.factor(fuel)+
 +                as.factor(gear)*engine_size + as.factor(gear)*as.factor(fuel)+
-+                engine_size*as.factor(fuel), nbest = 1,nvmax = 174,data = dados,really.big = T, method = "forward")
++                engine_size*as.factor(fuel), nbest = 1,nvmax = 174,data = dados_predicao,really.big = T, method = "forward")
 
 
 
@@ -297,33 +347,120 @@ par(mfrow = c(1, 1))
 ## 11483-11845 é uma caminhonete nissan 6.5 15000 reais
 ```
 
-Como é possível inferir, a distribuição dos resíduos continua a mesma, os plots de avaliação da normalidade e homoscedasticidade do resíduo continuam as mesmas,sem muitas alterações,podemos também checkar o _plateau_ que chega os valores das estatisticas que medem qualidade de ajuste de modelo após \( \approx 25 \), o que nos levam a concluir gráficamente que a inclusão não afetará significantemente os residuos do modelo porém a adição de um set de variáveis de interação com as marcas de veículos pode ajudar o modelo caso julgado necessário, para avaliar melhor isso segue os p-valores dos testes F de cada variável de interação e seus valores estimados:
+Como é possível inferir, a distribuição dos resíduos melhora em quesitos de normalidade e homoscedasticidade, mas sem diferenças substanciais, podemos também checar o _plateau_ que chega os valores das estatisticas que medem qualidade de ajuste de modelo após \( \approx 25 \), o que nos levam a concluir gráficamente que a inclusão não afetará significantemente os residuos do modelo.
 
 ```{r,warning=FALSE,fig.height=3,fig.width=5}
 model_summary <- summary(model_interacoes)
 
 interaction_p_values <- model_summary$coefficients[grep(":|\\*", rownames(model_summary$coefficients)), "Pr(>|t|)"]
-interaction_estimates <- model_summary$coefficients[grep(":|\\*", rownames(model_summary$coefficients)), "Estimate"]
-
-interaction_estimates <- round(interaction_estimates, digits = 4)
-
-p_values_table <- data.frame(P_Valor = interaction_p_values)
-p_values_table$P_Valor <- round(p_values_table$P_Valor, digits = 4)
-p_values_table$Estimado <- round(interaction_estimates,digits = 4)
 
 hist(interaction_p_values, main = "Distribuição dos p-valores das interações",ylab = "frequência",xlab = "p-valores")
-kable(p_values_table,format = "simple")%>%
-  kable_styling(full_width = FALSE)
+```
+  
+Surpreendentemente muitas variáveis tem p-valores menores do que o 0.05 estipulado como limiar de significância, isso indica que dada uma análise mais meticulosa da relação interativa entre as variáveis, podemos considerar em adicionar variáveis interativas ao modelo que ajudem a explicar melhor alguns desvios dos resíduos,como por exemplo nas interações \( X_{marca} X_{idade} \).
+
+Seguindo os objetivos do projeto, validamos o modelo em um intervalo de predição de 95%, considerando o modelo com interações e todas as dummies de brand:
+
+```{r predição 2, message=FALSE, warning=FALSE}
+intervalos_predicao <- predict(model_interacoes,validacao2, interval = "prediction")
+
+predicao <- data.frame(intervalos_predicao,true_value = log(validacao2$avg_price_brl))
+
+acertos <- ifelse(predicao$true_value < predicao$upr & predicao$true_value > predicao$lwr,1,0)
+
+tibble(acertou = ifelse(acertos == 1,"Sim","Não")) %>% ggplot(aes(x = acertou, fill = acertou))+
+  geom_bar()+
+  labs(title = "Contagem de erros x acertos dos intervalos de predição", y = "Contagem")+
+  theme_minimal()
+
+acuracia <- mean(acertos) *100
 ```
 
-Surpreendentemente muitas variáveis tem p-valores menores do que o 0.05 estipulado como limiar de significância, isso indica que dada uma análise mais meticulosa da relação interativa entre as variáveis, podemos considerar em adicionar variáveis interativas ao modelo que ajudem a explicar melhor alguns desvios dos resíduos,como por exemplo nas interações \( X_{marca} X_{idade} \) onde a maioria teve p-valor menor que 0.05,valores estimados significativos e não conteve valores faltates como a variável \( X_{combustivel} X_{marca} \) tiveram.
+A acurácia desse modelo é de `r acuracia`%.
 
-# Considerações finais
+Utilizando como parâmetro a acurácia da validação, não é eficiente manter este modelo como o preditor, visto que com o ganho mínimo, é preferível manter um modelo mais simples.
 
-## Comentários
 
-<!-- sua conclusao a partir dos dados e recomendacoes-->
+# Considerações e modelo final
 
-# Bibliografia
+```{r}
+model <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel) + as.factor(brand)*age_years,dados)
 
-<!-- não coloque nada aqui, será feito automaticamente se vc usar .bib e @ para citar referencias no texto, conforme o video explicativo indicado no roteiro-->
+```
+
+Feito todos os testes e considerações necessárias para aperfeiçoamento, chegamos ao modelo final que areditamos ser de melhor encaixe com nossos objetivos,que apresenta seguinte forma
+$$
+log(Y) =  \beta_0 + \beta_1 X_{idade} + \overline{\beta_2} X_{marcas} + \beta_3X_{câmbio} + \beta_4 X_{motor} + \overline{\beta_5}X_{combustivel} + \overline{\beta_6}X_{marcas}X_{idade}
+$$
+
+Com os seguintes coeficientes:
+
+```{r}
+model_summary <- summary(model)
+
+todos_p_valor <- model_summary$coefficients[, "Pr(>|t|)"]
+todos_estimados <- model_summary$coefficients[, "Estimate"]
+
+todos_estimados <- round(todos_estimados, digits = 5)
+
+final_tabela <- data.frame(
+  P_Valor = round(todos_p_valor, digits = 5),
+  Estimado = todos_estimados
+)
+
+kable(final_tabela, format = "html") %>%
+  kable_styling(latex_options = "scale_down") %>%
+  row_spec(0, bold = TRUE, font_size = 10)
+```
+
+Validando o modelo em um intervalo de predição de 95% temos
+
+```{r predição 3, message=FALSE, warning=FALSE}
+intervalos_predicao <- predict(model,validacao, interval = "prediction")
+
+predicao <- data.frame(intervalos_predicao,true_value = log(validacao$avg_price_brl))
+
+acertos <- ifelse(predicao$true_value < predicao$upr & predicao$true_value > predicao$lwr,1,0)
+
+tibble(acertou = ifelse(acertos == 1,"Sim","Não")) %>% ggplot(aes(x = acertou, fill = acertou))+
+  geom_bar()+
+  labs(title = "Contagem de erros x acertos dos intervalos de predição", y = "Contagem")+
+  theme_minimal()
+
+acuracia <- mean(acertos) *100
+
+```
+
+Com acurácia final de `r acuracia`%.
+
+#### Comentários
+
+Como é possível observar da tabela de p-valores e estimativas, os únicos valores com p-valor acima do limiar \( \alpha = 0.05 \) são:
+
+* Marca : Hyundai 
+* Interação Marca*Idade : Fiat 
+* Interação Marca*Idade : BMW
+
+Isso se deve à volatilidade dos valores das marcas em relação ao tempo, ou seja, a interação não tem valor significativo para negar a hipótese \( \beta = 0 \).O mesmo se dá para os carros da Hyundai, onde, após realizado o teste, não se pode rejeitar a hipótese nula.
+
+O carro "padrão", que é referente ao intercepto, usado no modelo é das seguintes especificações, de uma das marcas **Alternativas**,movido a **alcool**, com motor de tamanho **0** , **0** anos desde a fabricação e câmbio **automático**
+
+#### Curiosidades 
+
+* A marca que mais reduz o preço estimado do veículo é a Ford Motors.
+* A marca que mais aumenta o preço estimado é a Audi.
+* Carros manuais são esperados a serem mais baratos, da mesma forma que carros movidos a álcool/flex.
+* A marca que mais valoriza com o tempo é a Chevrolet.
+* A marca que mais desvaloriza com o tempo é : Audi
+* As especificações do carro de menor valor estimado seria : Um Ford,velho (38 anos é o mais velho na tabela) , movido a alcool/flex , motor 1.0, os modelos que mais se aproximas são o Corcel,Del Rey e Escort 1986, todos 1.6
+* As especificações do carro de maior valor estimado seria : Um Audi, ano 2022, motor 6.0, a Diesel o modelo que melhor se encaixa seria um Audi A8 2022 motor V8 4.0 Diesel
+
+# Conclusão
+
+Os resultados obtidos podem ser avaliados mais detalhadamente na tabela sumária do modelo. Em resumo, acreditamos que nenhum dos valores observados foi exageradamente discrepante em relação ao esperado. O desenvolvimento deste trabalho serviu mais para quantificar os efeitos das variáveis do que para desafiar ideias preconcebidas sobre os fatores influentes.
+
+O trabalho foi realizado com sucesso, e todas as variáveis disponíveis foram devidamente analisadas com os conhecimentos adquiridos durante o curso. A aplicação dos métodos desenvolvidos em sala de aula mostrou-se eficaz como ferramenta de ensino. No decorrer do trabalho, percebemos que a regressão linear múltipla é uma ferramenta poderosa e adaptável para diversas situações, além de ser altamente personalizável dependendo dos nossos objetivos. Um usuário bem informado, com conhecimento dos métodos necessários, pode definitivamente extrair informações valiosas de vários conjuntos de dados.
+
+Muitos fatores influenciam o preço de um carro. Neste trabalho, as avaliações foram feitas apenas com os dados fornecidos pela tabela FIPE. No entanto, a avaliação de preços de bens é uma questão muito mais complexa, que exige a avaliação de especialistas tanto mecânicos quanto econômicos, para considerar a influência das tendências de mercado na valoração do veículo.
+
+Com isso, concluímos que a análise de regressão linear foi eficaz para os objetivos deste estudo e forneceu insights valiosos sobre os fatores que influenciam os preços dos carros, além de produzir um modelo que preditivo muito acurado, possibilitando análise de risco e diversas aplicações. Para análises futuras, recomenda-se a inclusão de dados adicionais e a consulta a especialistas para obter uma avaliação ainda mais precisa e abrangente.
