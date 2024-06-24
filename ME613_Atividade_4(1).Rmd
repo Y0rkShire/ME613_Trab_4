@@ -112,7 +112,7 @@ dados_predicao <- dados
 dados$brand <- ifelse(dados$brand %nin% c("VW - VolksWagen","Fiat","GM - Chevrolet","BMW","Mercedes-Benz","Renault","Peugeot","Ford","Citroën","Audi","Hyundai","Mitsubishi"),"Alternativos",dados$brand)
 ```
 
-Como foi descrito anteriormente os dados tem um certo problema com a distribuição dos preços do veículos, assim prosseguimos a definir um dos objetivos do modelo, filtramos as observações para uma faixa de preço usual no consumo automotivo médio brasileiro (até R$100 000), e temos uma distribuição muito mais homogênea na variável resposta que facilitará a ánalise e ajuste do modelo
+Como foi descrito anteriormente os dados tem um certo problema com a distribuição dos preços do veículos, assim prosseguimos a definir um dos objetivos do modelo, filtramos as observações para uma faixa de preço usual no consumo automotivo brasileiro (até R$300 000), e temos uma distribuição muito mais homogênea na variável resposta que facilitará a ánalise e ajuste do modelo
 ```{r, distribuição preços, fig.height=4, fig.width=8}
 dados <- dados %>% filter(avg_price_brl <= 300000)
 #analisando carros de preço acessivel
@@ -131,7 +131,7 @@ validacao <- dados[linhas,]
 validacao2 <- dados_predicao[linhas,]
 
 dados <- dados[-linhas,]
-dados_predicao[-linhas,]
+dados_predicao <- dados_predicao[-linhas,]
 ```
 
 # Aplicando o modelo de regressão
