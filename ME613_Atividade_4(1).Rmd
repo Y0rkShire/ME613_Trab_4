@@ -4,11 +4,8 @@ author:
 - Danilo Sucomine Carreira 204244
 - Felipe Camilo de Queiroz 222006
 output:
-  html_document:
-    toc: false
-    df_print: paged
-  bookdown::pdf_document2:
-    toc: false
+ bookdown::pdf_document2:
+     toc: FALSE
 ---
 
 ```{r setup, include=FALSE}
@@ -18,12 +15,8 @@ options(knitr.table.format = "latex")
 options(scipen = 999,digits=2)
 ```
 
-
 ```{r,message=FALSE}
-temp <- read.csv(choose.files())
-```
-
-```{r,message=FALSE}
+library(googlesheets4)
 library(car)
 library(tidyverse)
 library(GGally)
@@ -33,6 +26,9 @@ library(kableExtra)
 library(ggplot2)
 ```
 
+```{r,message=FALSE}
+temp <- read_sheet("https://docs.google.com/spreadsheets/d/1ck2j3zG-sCJ5ycLFbdeVZt7IHa8hqh1f0OGL4-I26SI/edit?usp=sharing")
+```
 
 # Introdução
 
@@ -43,7 +39,7 @@ library(ggplot2)
 
 O banco de dados se trata de um extrato histórico da tabela FIPE, retirada do site https://veiculos.fipe.org.br ; Nos dados, temos o preço médio estimado pela FIPE de um modelo de veículo em certo mês de referência de 2022, e diversas características do exato modelo. As colunas fuel, gear e engine_size foram retiradas de uma só coluna no site, chamada modelo. Adicionalmente, se "Aut" não estava presente na coluna modelo, o carro foi assumido como manual.
 
-#### Variáveis Utilizadas:
+## Variáveis Utilizadas:
 * `year_of_reference:` Ano de referência na coleta dos dados  
 * `month_of_reference:` Mês de referência na coleta dos dados  
 * `brand:` Marca montadora do veículo
@@ -58,7 +54,7 @@ O banco de dados se trata de um extrato histórico da tabela FIPE, retirada do s
 
 Realizamos a análise exploratória com o objetivo de garantir o funcionamento do modelo e sua máxima eficácia para que se alinhe com nossos objetivos, fazemos a análise conjunta com o tratamento de dados antes de prosseguir para o modelo e os testes
 
-#### Tratamento de dados
+## Tratamento de dados
 
 Como a tabela FIPE é refeita mensalmente e o banco de dados escolhido é fruto de valores de um ano inteiro, começamos escolhendo um mês como referência para análise, para evitar dependência temporal entre carros de mesmo modelos sendo avaliados novamente, devido ao fato de __novembro__ ser o mês com maior quantidade de observações esse foi o mês escolhido.
 
@@ -66,7 +62,7 @@ Como a tabela FIPE é refeita mensalmente e o banco de dados escolhido é fruto 
 dados <- temp %>% dplyr::filter(month_of_reference == "November")
 ```
 
-#### Gráficos para análise
+## Gráficos para análise
 
 Realizamos então a análise descritiva dos dados, buscando por anormalidades, tais como outliers, inputs errados, dados faltantes etc que podem afetar o funcionamento do modelo com o decorrer do processo:
 
@@ -138,7 +134,7 @@ dados_predicao <- dados_predicao[-linhas,]
 
 Feita os tratamentos de dados podemos iniciar a implementação do modelo de regressão linear múltipla simples, baseado no nosso banco de dados foi escolhido as seguintes variáveis inicialmente: 
 
-#### Variáveis do modelo inicial:
+## Variáveis do modelo inicial:
 
 | Categoria                    | Detalhes                                                        |
 |------------------------------|-----------------------------------------------------------------|
@@ -154,7 +150,7 @@ Feita os tratamentos de dados podemos iniciar a implementação do modelo de reg
 model <- lm(avg_price_brl ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
 ```
 
-#### Primeiro modelo
+## Primeiro modelo
 
 Inicialmente, consideramos o modelo mais natural \( Y_{valor} = X\beta + \epsilon \) e fizemos a análise de resíduos a partir dele para avaliar a credibilidade da análise, análisando o ajuste do modelo obtemos um \( R^2 = \) `r format(summary(model)$r.squared, digits = 3)` e \( R^2_{\text{ajustado}} = \) `r format(summary(model)$adj.r.squared, digits = 3)` e geramos os gráficos para análise de resíduos:
 
@@ -174,7 +170,7 @@ title(main = "Residuos vs Alavanca", sub = "", ylab = "Resíduos", xlab = "Alava
 par(mfrow = c(1, 1))
 ```
 
-#### Segundo modelo
+## Segundo modelo
 
 ```{r segundo modelo}
 model <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel),dados)
@@ -202,10 +198,10 @@ par(mfrow = c(1, 1))
 hist(model$residuals,main = "Histograma dos Residuos do modelo",ylab = "Frequência",xlab = "Residuos do modelo")
 ```
 
-#### Análise das váriaveis do modelo
+### Análise das váriaveis do modelo
 
 Como pode ser analisado os valores de \(R^2 e R^2_{ajustado} \) melhoraram e os gráficos de resíduos também apresentam formas que indicam melhor ajuste dos resíduos a normalidade, assim prosseguimos para a análise das variáveis \( X \) do modelo, calculamos os valores de VIF *Variance Inflation Factor* para avaliar a multicolinearidade das varáveis do modelo, valoroes altos (acima de 10) indicariam que existe multicolinearidade entre as variáveis.
-```{r VIF segundo modelo,warning=FALSE}
+```{r VIF segundo modelo,warning=FALSE,warning=FALSE}
 vif_values <- car::vif(model)
 
 vif_df <- data.frame(VIF = round(vif_values, 2))
@@ -230,7 +226,7 @@ Após a análise dos gráficos de efeitos parciais gerados para o modelo, podemo
 
 Para finalizar a análise das variáveis que já estavam contidas no modelo realizaremos calculos das estatisticas de seleção de modelos tais como BIC,CP de Mellow,R quadrado,R quadrado ajustado,Soma de residuos quadrada, considerando o equilíbrio entre o ajuste do modelo, sua complexidade e a capacidade de explicar a variabilidade na variável de resposta
 
-```{r}
+```{r,warning=FALSE,message=FALSE,echo=FALSE}
 leaps <- regsubsets(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel), nbest= 1,data = dados,nvmax = 17,really.big = T)
 
 par(mfrow = c(2, 3))
@@ -251,7 +247,7 @@ par(mfrow = c(1, 1))
 Como pode-se observar os valores são semelhantes para todos os testes, o que serve de forte indício que adotado um certo nº de variáveis teremos resultados semelhantes das diversas estatísticas para validação de escolha de variáveis.
 
 A estimativa e os p-valores foram:
-```{r}
+```{r,warning=FALSE}
 model_summary <- summary(model)
 
 todos_p_valor <- model_summary$coefficients[, "Pr(>|t|)"]
@@ -264,14 +260,16 @@ final_tabela <- data.frame(
   Estimado = todos_estimados
 )
 
-kable(final_tabela, format = "html") %>%
+kable(final_tabela, format = "simple") %>%
   kable_styling(latex_options = "scale_down") %>%
   row_spec(0, bold = TRUE, font_size = 10)
 ```
 
+## Análise de predição
+
 Por fim, observamos a acurácia do modelo sob a validação cruzada em intervalos de predição de 95%, utilizando como preditores observações separadas no inicio da análise:
 
-```{r predição 1, message=FALSE, warning=FALSE}
+```{r predição 1, message=FALSE, warning=FALSE,fig.height=4,fig.width=4}
 intervalos_predicao <- predict(model,validacao, interval = "prediction")
 
 predicao <- data.frame(intervalos_predicao,true_value = log(validacao$avg_price_brl))
@@ -287,9 +285,9 @@ acuracia <- mean(acertos) *100
 
 ```
 
-Utilizando este modelo, obtemos uma acurácia de `r acuracia`%.
+Utilizando este modelo, obtemos uma acurácia de `r acuracia`%, o que indica que o modelo também é bem ajustado para predição do preço de veículos, isso se deve ao fato da extensa quantidade de entradas no modelo, assim apesar do modelo de predição ter sido rodado com 75% dos dados ele continua com um ajuste bom para novas entradas.
 
-#### Análise das variáveis de interação de um grau \(X_1X_2\)
+## Análise das variáveis de interação de um grau \(X_1X_2\)
 
 ```{r modelo com interações}
 model_interacoes <- lm(log(avg_price_brl) ~  age_years +as.factor(brand)+ as.factor(gear) + engine_size + as.factor(fuel)+
@@ -361,7 +359,7 @@ Surpreendentemente muitas variáveis tem p-valores menores do que o 0.05 estipul
 
 Seguindo os objetivos do projeto, validamos o modelo em um intervalo de predição de 95%, considerando o modelo com interações e todas as dummies de brand:
 
-```{r predição 2, message=FALSE, warning=FALSE}
+```{r predição 2, message=FALSE, warning=FALSE,fig.height=4,fig.width=4}
 intervalos_predicao <- predict(model_interacoes,validacao2, interval = "prediction")
 
 predicao <- data.frame(intervalos_predicao,true_value = log(validacao2$avg_price_brl))
@@ -395,7 +393,7 @@ $$
 
 Com os seguintes coeficientes:
 
-```{r}
+```{r,warning=FALSE}
 model_summary <- summary(model)
 
 todos_p_valor <- model_summary$coefficients[, "Pr(>|t|)"]
@@ -408,14 +406,14 @@ final_tabela <- data.frame(
   Estimado = todos_estimados
 )
 
-kable(final_tabela, format = "html") %>%
+kable(final_tabela, format = "simple") %>%
   kable_styling(latex_options = "scale_down") %>%
   row_spec(0, bold = TRUE, font_size = 10)
 ```
 
 Validando o modelo em um intervalo de predição de 95% temos
 
-```{r predição 3, message=FALSE, warning=FALSE}
+```{r predição 3, message=FALSE, warning=FALSE,fig.height=4,fig.width=4}
 intervalos_predicao <- predict(model,validacao, interval = "prediction")
 
 predicao <- data.frame(intervalos_predicao,true_value = log(validacao$avg_price_brl))
@@ -433,7 +431,7 @@ acuracia <- mean(acertos) *100
 
 Com acurácia final de `r acuracia`%.
 
-#### Comentários
+## Comentários
 
 Como é possível observar da tabela de p-valores e estimativas, os únicos valores com p-valor acima do limiar \( \alpha = 0.05 \) são:
 
@@ -445,7 +443,7 @@ Isso se deve à volatilidade dos valores das marcas em relação ao tempo, ou se
 
 O carro "padrão", que é referente ao intercepto, usado no modelo é das seguintes especificações, de uma das marcas **Alternativas**,movido a **alcool**, com motor de tamanho **0** , **0** anos desde a fabricação e câmbio **automático**
 
-#### Curiosidades 
+## Curiosidades 
 
 * A marca que mais reduz o preço estimado do veículo é a Ford Motors.
 * A marca que mais aumenta o preço estimado é a Audi.
